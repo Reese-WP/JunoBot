@@ -4,8 +4,8 @@ import com.google.gson.*;
 import okhttp3.*;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.*;
+import java.nio.file.*;
 
 public class AI {
 
@@ -14,23 +14,35 @@ public class AI {
     private final Gson gson;
     private final String systemPrompt;
 
-    private final List<JsonObject> conversation = new ArrayList<>();
+    private final JsonArray conversation = new JsonArray();
+    private static final String MemoryLocation = "Memory.json";
 
     public AI(String systemPrompt) {
+        //load api key
         this.apiKey = System.getenv("DEEPSEEK_API_KEY");
         if (apiKey == null)
             throw new IllegalStateException("DEEPSEEK_API_KEY environment variable not set");
 
+        //inititate objects / variables
         this.httpClient = new OkHttpClient();
-        this.gson = new Gson();
+        this.gson = new GsonBuilder().setPrettyPrinting().create();
         this.systemPrompt = systemPrompt;
 
         // Add system message at start
-        JsonObject systemMessage = new JsonObject();
-        systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", systemPrompt);
+        try {
+            loadConversation();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-        conversation.add(systemMessage);
+        if (conversation.size() == 0) {
+            JsonObject systemMessage = new JsonObject();
+            systemMessage.addProperty("role", "system");
+            systemMessage.addProperty("content", systemPrompt);
+            conversation.add(systemMessage);
+
+        }
+
     }
 
     public String send(String input) throws IOException {
@@ -41,15 +53,9 @@ public class AI {
         userMessage.addProperty("content", input);
         conversation.add(userMessage);
 
-        // Build messages array
-        JsonArray messagesArray = new JsonArray();
-        for (JsonObject msg : conversation) {
-            messagesArray.add(msg);
-        }
-
         JsonObject jsonBody = new JsonObject();
         jsonBody.addProperty("model", "deepseek-chat");
-        jsonBody.add("messages", messagesArray);
+        jsonBody.add("messages", conversation);
 
         RequestBody body = RequestBody.create(
                 jsonBody.toString(),
@@ -85,18 +91,45 @@ public class AI {
             assistantMessage.addProperty("role", "assistant");
             assistantMessage.addProperty("content", content);
             conversation.add(assistantMessage);
+            saveConversation();
+            System.out.println(Paths.get(MemoryLocation).toAbsolutePath());
 
             return content;
         }
     }
 
-    public void clearConversation() {
-        conversation.clear();
-
-        JsonObject systemMessage = new JsonObject();
-        systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", systemPrompt);
-
-        conversation.add(systemMessage);
+    private void saveConversation() throws IOException {
+        try (Writer writer = Files.newBufferedWriter(Paths.get(MemoryLocation))) {
+            gson.toJson(conversation, writer);
+        }
     }
+
+    private void loadConversation() throws IOException {
+        Path path = Paths.get(MemoryLocation);
+
+        if (Files.exists(path)) {
+
+            if (Files.size(path) == 0) {
+                return; // empty file, nothing to load
+            }
+
+            try (Reader reader = Files.newBufferedReader(path)) {
+
+                JsonArray loaded = gson.fromJson(reader, JsonArray.class);
+
+                if (loaded == null) {
+                    return; // invalid or empty JSON
+                }
+
+                int i = 0;
+                while(!conversation.isEmpty()) {conversation.remove(i); i++;}
+
+                for (JsonElement element : loaded) {
+                    conversation.add(element);
+                }
+            }
+        }
+    }
+
+
 }
