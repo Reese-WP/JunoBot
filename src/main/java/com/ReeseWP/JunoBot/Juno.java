@@ -32,7 +32,7 @@ public class Juno {
     }
 
     public static void main(String[] args) {
-        prompt = System.getenv("JUNO_AI_PROMPT");
+        prompt = System.getenv("JUNO_SYSTEM_PROMPT");
         junoAI = new AI(prompt);
         try {
             new Juno(); // Start the bot

@@ -9,7 +9,7 @@ import java.nio.file.*;
 
 public class AI {
 
-    private final String apiKey;
+    private String apiKey;
     private final OkHttpClient httpClient;
     private final Gson gson;
     private final String systemPrompt;
@@ -19,9 +19,9 @@ public class AI {
 
     public AI(String systemPrompt) {
         //load api key
-        this.apiKey = System.getenv("DEEPSEEK_API_KEY");
+        this.apiKey = System.getenv("JUNO_AI_TOKEN");
         if (apiKey == null)
-            throw new IllegalStateException("DEEPSEEK_API_KEY environment variable not set");
+            throw new IllegalStateException("JUNO_AI_TOKEN environment variable not set, given token: " + apiKey);
 
         //inititate objects / variables
         this.httpClient = new OkHttpClient();
